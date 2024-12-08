@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "check-yamlschema"
+version = "0.0.1"
+description = "A CLI and pre-commit hooks for jsonschema validation in YAML files with multiple documents"
+authors = [
+    { name = "Joel Baranick", email = "jbaranick@gmail.com" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+]
+requires-python = ">=3.8"
+dependencies = [
+    'check-jsonschema==0.30.0',
+    "click>=8,<9",
+]
+
+[project.urls]
+Homepage = "https://github.com/kadaan/check-yamlschema"
+
+[project.scripts]
+check-yamlschema = "check_yamlschema:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = false
+
+[tool.isort]
+profile = "black"
