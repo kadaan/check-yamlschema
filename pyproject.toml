@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "check-yamlschema"
-version = "0.0.1"
+version = "0.0.2"
 description = "A CLI and pre-commit hooks for jsonschema validation in YAML files with multiple documents"
 authors = [
     { name = "Joel Baranick", email = "jbaranick@gmail.com" },
@@ -17,7 +17,7 @@ classifiers = [
 ]
 requires-python = ">=3.8"
 dependencies = [
-    'check-jsonschema==0.30.0',
+    'check-jsonschema==0.31.0',
     "click>=8,<9",
 ]
 

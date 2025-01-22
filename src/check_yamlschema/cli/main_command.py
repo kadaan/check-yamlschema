@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import jsonschema
+
 import argparse
 import io
 import logging
+import pathlib
 import re
 import typing as t
 from dataclasses import dataclass
 
 from check_jsonschema.checker import SchemaChecker
+from check_jsonschema.formats import FormatOptions
 from check_jsonschema.instance_loader import InstanceLoader
 from check_jsonschema.parsers import ParseError
+from check_jsonschema.regex_variants import RegexImplementation, RegexVariantName
 from check_jsonschema.reporter import TextReporter, Reporter
 from check_jsonschema.result import CheckResult
 from check_jsonschema.schema_loader import SchemaLoader
@@ -169,6 +174,30 @@ class AggregatingReporter(Reporter):
                 self.result.record_parse_error(path, error)
 
 
+class MultipleRegexFormatSchemaLoader(SchemaLoader):
+    def __init__(self, schemafile: str, regex_impls: [RegexImplementation]):
+        super().__init__(schemafile, disable_cache=True)
+        self._regex_impls = regex_impls
+
+    def get_validator(self, path: pathlib.Path | str, instance_doc: dict[str, t.Any], format_opts: FormatOptions,
+                      regex_impl: RegexImplementation, fill_defaults: bool) -> jsonschema.protocols.Validator:
+        try:
+            return super().get_validator(path, instance_doc, format_opts, regex_impl, fill_defaults)
+        except jsonschema.SchemaError:
+            regex_impls = [v for v in self._regex_impls if v.variant != regex_impl.variant]
+            for index in range(len(regex_impls)):
+                try:
+                    loader_format_opts = FormatOptions(
+                        regex_impl=regex_impls[index],
+                        enabled=format_opts.enabled,
+                        disabled_formats=format_opts.disabled_formats
+                    )
+                    return super().get_validator(path, instance_doc, loader_format_opts, regex_impls[index], fill_defaults)
+                except jsonschema.SchemaError:
+                    if index == len(regex_impls) - 1:
+                        raise
+
+
 def _detail(block, verbosity: int, **kwargs):
     if verbosity > 2:
         click.echo(click.style("", fg=(128, 128, 128), reset=False), nl=False)
@@ -218,6 +247,7 @@ def main():
     args.verbose = args.verbose + 1
 
     _detail(_log_command, args.verbose, file_paths=args.files, require_schema=args.require_schema, verbose=args.verbose)
+    regex_impls = [RegexImplementation(v) for v in RegexVariantName]
 
     result = CheckResult()
     aggregating_reporter = AggregatingReporter(result)
@@ -232,9 +262,14 @@ def main():
             else:
                 _detail(_log_missing_schemas, args.verbose, files=files)
         else:
-            schema_loader = SchemaLoader(schema_url, disable_cache=False)
+            schema_loader = MultipleRegexFormatSchemaLoader(schema_url, regex_impls)
             instance_loader = DocumentInstanceLoader(sorted(files.items()))
-            checker = SchemaChecker(schema_loader, instance_loader, aggregating_reporter)
+            format_opts = FormatOptions(regex_impl=RegexImplementation(RegexVariantName.default))
+            checker = SchemaChecker(schema_loader,
+                                    instance_loader,
+                                    aggregating_reporter,
+                                    format_opts=format_opts,
+                                    regex_impl=RegexImplementation(RegexVariantName.default))
             checker.run()
 
     reporter = TextReporter(verbosity=args.verbose)
